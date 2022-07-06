@@ -30,7 +30,7 @@ public abstract class AbstractGA<G extends Number, F> {
 	 * flag that indicates whether the code should print more information on
 	 * screen
 	 */
-	public static boolean verbose = true;
+	public boolean verbose;
 
 	/**
 	 * a random number generator
@@ -140,12 +140,13 @@ public abstract class AbstractGA<G extends Number, F> {
 	 * @param mutationRate
 	 *            The mutation rate.
 	 */
-	public AbstractGA(Evaluator<F> objFunction, Integer generations, Integer popSize, Double mutationRate) {
+	public AbstractGA(Evaluator<F> objFunction, Integer generations, Integer popSize, Double mutationRate, Boolean verbose) {
 		this.ObjFunction = objFunction;
 		this.generations = generations;
 		this.popSize = popSize;
 		this.chromosomeSize = this.ObjFunction.getDomainSize();
 		this.mutationRate = mutationRate;
+		this.verbose = verbose;
 	}
 
 	/**
@@ -163,7 +164,9 @@ public abstract class AbstractGA<G extends Number, F> {
 
 		bestChromosome = getBestChromosome(population);
 		bestSol = decode(bestChromosome);
-		System.out.println("(Gen. " + 0 + ") BestSol = " + bestSol);
+		if (verbose) {
+			System.out.println("(Gen. " + 0 + ") BestSol = " + bestSol);
+		}
 
 		/*
 		 * enters the main loop and repeats until a given number of generations
