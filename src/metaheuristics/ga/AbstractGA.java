@@ -32,6 +32,7 @@ public abstract class AbstractGA<G extends Number, F> {
 	 */
 	public boolean verbose;
 
+	public boolean localSearchEnabled;
 	/**
 	 * a random number generator
 	 */
@@ -128,6 +129,8 @@ public abstract class AbstractGA<G extends Number, F> {
 
 	protected abstract void repairChromosome(Chromosome chromosome);
 
+	protected abstract void localSearch(Chromosome chromosome);
+
 	/**
 	 * The constructor for the GA class.
 	 * 
@@ -140,13 +143,14 @@ public abstract class AbstractGA<G extends Number, F> {
 	 * @param mutationRate
 	 *            The mutation rate.
 	 */
-	public AbstractGA(Evaluator<F> objFunction, Integer generations, Integer popSize, Double mutationRate, Boolean verbose) {
+	public AbstractGA(Evaluator<F> objFunction, Integer generations, Integer popSize, Double mutationRate, Boolean verbose, Boolean localSearchEnabled) {
 		this.ObjFunction = objFunction;
 		this.generations = generations;
 		this.popSize = popSize;
 		this.chromosomeSize = this.ObjFunction.getDomainSize();
 		this.mutationRate = mutationRate;
 		this.verbose = verbose;
+		this.localSearchEnabled = localSearchEnabled;
 	}
 
 	/**
@@ -191,6 +195,16 @@ public abstract class AbstractGA<G extends Number, F> {
 					System.out.println("(Gen. " + g + ") BestSol = " + bestSol);
 			}
 
+		}
+
+		if (localSearchEnabled) {
+			localSearch(bestChromosome);
+			Solution<F> localSearchSol = decode(bestChromosome);
+			if (verbose && bestSol.cost < localSearchSol.cost) {
+				System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+				System.out.println("(Gen. " + "localSearch" + ") BestSol = " + localSearchSol);
+			}
+			bestSol = localSearchSol;
 		}
 
 		return bestSol;
@@ -386,5 +400,4 @@ public abstract class AbstractGA<G extends Number, F> {
 
 		return offsprings;
 	}
-
 }

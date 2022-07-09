@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import apple.laf.JRSUIUtils.InternalFrame;
 import metaheuristics.ga.AbstractGA;
 import problems.MKP.MKP;
 import solutions.Solution;
@@ -35,8 +36,8 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 	private final CrossoverOperator crossoverOperator;
 	private final RepairFunction repairFunction;
 
-	public GA_MKP(Integer generations, Integer popSize, Double mutationRate, String filename, Boolean verbose, MutationStrategy mutationStrategy, CrossoverOperator crossoverOperator, RepairFunction repairFunction) throws IOException {
-		super(new MKP(filename), generations, popSize, mutationRate, verbose);
+	public GA_MKP(Integer generations, Integer popSize, Double mutationRate, String filename, Boolean verbose, MutationStrategy mutationStrategy, CrossoverOperator crossoverOperator, RepairFunction repairFunction, Boolean localSearchEnabled) throws IOException {
+		super(new MKP(filename), generations, popSize, mutationRate, verbose, localSearchEnabled);
 		this.mutationStrategy = mutationStrategy;
 		this.crossoverOperator = crossoverOperator;
 		this.repairFunction = repairFunction;
@@ -167,7 +168,6 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 	}
 
 	protected void repairChromosomeRandom(Chromosome chromosome) {
-
 		MKP mkp = (MKP) this.ObjFunction;
 		Double[] accumulatedResources = new Double[mkp.getNumKnapsacks()];
 		for (int i=0; i < mkp.getNumKnapsacks(); i++) {
@@ -222,6 +222,17 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 		return true;
 	}
 
+	private boolean isValidChromosome(Double[] accumulatedResources, int candIn, int candOut) {
+		MKP mkp = (MKP) this.ObjFunction;
+		for (int i=0; i < mkp.getNumKnapsacks(); i++) {
+			if (accumulatedResources[i] + mkp.getR()[i][candIn] - mkp.getR()[i][candOut] > mkp.getB()[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+
 	@Override
 	protected Population crossover(Population parents) {
 
@@ -270,15 +281,81 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 
 	}
 
+	public void localSearch(Chromosome chromosome) {
+		MKP mkp = (MKP) this.ObjFunction;
+		Double[] accumulatedResources = new Double[mkp.getNumKnapsacks()];
+		for (int i=0; i < mkp.getNumKnapsacks(); i++) {
+			Double sum = 0.0;
+			for (int j=0; j < mkp.getDomainSize(); j++) {
+				sum += mkp.getR()[i][j]*chromosome.get(j);
+			}
+			accumulatedResources[i] = sum;
+		}
+
+		Double maxDeltaCost;
+		Integer bestCandIn = null, bestCandOut = null;
+
+		do {
+			maxDeltaCost = 0.0;
+			Solution<Integer> sol = decode(chromosome);
+
+			// Evaluate insertions
+			for (int j=0; j < mkp.getDomainSize(); j++ ) {
+				Integer candIn = chromosome.get(j);
+				if (candIn == 0) {
+					double deltaCost = ObjFunction.evaluateInsertionCost(j, sol);
+					if (deltaCost > maxDeltaCost && isValidChromosome(accumulatedResources, j)) {
+						maxDeltaCost = deltaCost;
+						bestCandIn = j;
+						bestCandOut = null;
+					}
+				}
+			}
+		
+			// Evaluate exchanges
+			for (int j=0; j < mkp.getDomainSize(); j++ ) {
+				Integer candIn = chromosome.get(j);
+				if (candIn == 0) {
+					for (int j2=0; j2 < mkp.getDomainSize(); j2++ ) {
+						Integer candOut = chromosome.get(j2);
+						if (candOut == 1) {
+							double deltaCost = ObjFunction.evaluateExchangeCost(j, j2, sol);
+							if (j != j2 && deltaCost > maxDeltaCost && isValidChromosome(accumulatedResources, j, j2)) {
+								maxDeltaCost = deltaCost;
+								bestCandIn = j;
+								bestCandOut = j2;
+							}
+						}
+						
+					}
+				}
+			}
+			
+			// Implement the best move, if it reduces the solution cost.
+			if (maxDeltaCost > 0.0) {
+				if (bestCandOut != null) {
+					chromosome.set(bestCandOut, 0);
+				}
+				if (bestCandIn != null) {
+					chromosome.set(bestCandIn, 1);
+				}
+				sol = decode(chromosome);
+			}
+
+		} while (maxDeltaCost != 0.0);
+
+	}
+
 	public static void main(String[] args) throws IOException {
 
 		int generations = 1000;
 		int popSize = 100;
 		Double mutationRate = 0.001;
-		Boolean csv = true;
+		Boolean csv = false;
 		CrossoverOperator crossoverOperator = CrossoverOperator.UNIFORM;
 		MutationStrategy mutationStrategy = MutationStrategy.ADAPTIVE;
 		RepairFunction repairFunction = RepairFunction.DROPADD;
+		Boolean localSearchEnabled = true;
 		String solution_name = "solution4.csv";
 
 		//solution1 = repair method Dro
@@ -295,7 +372,7 @@ public class GA_MKP extends AbstractGA<Integer, Integer> {
 			}
 
 			long startTime = System.currentTimeMillis();
-			GA_MKP ga = new GA_MKP(Integer.valueOf(generations), Integer.valueOf(popSize), mutationRate, file.getAbsolutePath(), !csv, mutationStrategy, crossoverOperator, repairFunction);
+			GA_MKP ga = new GA_MKP(Integer.valueOf(generations), Integer.valueOf(popSize), mutationRate, file.getAbsolutePath(), !csv, mutationStrategy, crossoverOperator, repairFunction, localSearchEnabled);
 			Solution<Integer> bestSol = ga.solve();
 			if (csv) {
 				System.out.println("filename = " + file.getName());
